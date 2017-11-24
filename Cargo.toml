@@ -1,0 +1,22 @@
+[package]
+name = "rrecutils"
+version = "0.1.0"
+authors = ["Getty Ritter <gettylefou@gmail.com>"]
+
+[lib]
+name = "rrecutils"
+path = "src/lib.rs"
+
+[dependencies]
+regex = "0.2"
+serde = "*"
+serde_json = "*"
+clap = "2.27.1"
+
+[[bin]]
+name = "rr-pretty"
+path = "src/tools/pretty.rs"
+
+[[bin]]
+name = "rr-to-json"
+path = "src/tools/tojson.rs"

@@ -1,0 +1,17 @@
+%rec: Article
+
+Id: 1
+Title: Article 1
+
+Id: 2
+Title: Article 2
+
+%rec: Stock
+
+Id: 1
+Type: sell
+Date: 20 April 2011
+
+Id: 2
+Type: stock
+Date: 21 April 2011
