@@ -1,10 +1,12 @@
 extern crate clap;
 extern crate rrecutils;
 
+mod common;
+
 fn main() {
     let matches = clap::App::new("rr-sel")
-        .version("0.0")
-        .author("Getty Ritter <rrecutils@infinitenegativeutility.com>")
+        .version(common::VERSION)
+        .author(common::AUTHOR)
         .about("Print records from a recfile")
 
         .arg(clap::Arg::with_name("type")

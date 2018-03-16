@@ -6,6 +6,8 @@ use std::{fs,io};
 use std::convert::From;
 use std::string::FromUtf8Error;
 
+mod common;
+
 use rustache::Render;
 
 struct R {
@@ -63,10 +65,10 @@ impl From<String> for FormatErr {
 }
 
 
-fn run() -> Result<(), FormatErr> {
-    let matches = clap::App::new("rr-format")
-        .version("0.0")
-        .author("Getty Ritter <rrecutils@infinitenegativeutility.com>")
+fn rr_format_args() -> clap::ArgMatches<'static> {
+    clap::App::new("rr-format")
+        .version(common::VERSION)
+        .author(common::AUTHOR)
         .about("Display the Rust AST for a Recutils file")
 
         .arg(clap::Arg::with_name("input")
@@ -100,16 +102,16 @@ fn run() -> Result<(), FormatErr> {
              .value_name("STRING")
              .help("The string used to separate each fragment"))
 
-        .get_matches();
+        .get_matches()
+}
 
-    let stdin = io::stdin();
+fn run() -> Result<(), FormatErr> {
+    let matches = rr_format_args();
 
-    let input: Box<io::BufRead> =
-        match matches.value_of("input").unwrap_or("-") {
-            "-" => Box::new(stdin.lock()),
-            path =>
-                Box::new(io::BufReader::new(fs::File::open(path)?)),
-        };
+    let input = common::input_from_spec(
+        matches.value_of("input"))?;
+    let mut output = common::output_from_spec(
+        matches.value_of("output"))?;
 
     let template: String = match matches.value_of("mustache") {
         Some(path) => {
@@ -127,11 +129,6 @@ fn run() -> Result<(), FormatErr> {
         recfile.filter_by_type(typ);
     }
 
-    let mut output: Box<io::Write> =
-        match matches.value_of("output").unwrap_or("-") {
-            "-" => Box::new(io::stdout()),
-            path => Box::new(fs::File::open(path)?),
-        };
 
     let joiner = matches.value_of("joiner");
 

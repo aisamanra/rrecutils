@@ -2,7 +2,9 @@ extern crate clap;
 extern crate rrecutils;
 extern crate serde_json;
 
-use std::{fmt,fs,io};
+mod common;
+
+use std::fmt;
 
 use serde_json::Value;
 use serde_json::map::Map;
@@ -29,8 +31,8 @@ fn unwrap_err<L, R: fmt::Debug>(value: Result<L, R>) -> L {
 
 fn main() {
     let matches = clap::App::new("rr-to-json")
-        .version("0.0")
-        .author("Getty Ritter <rrecutils@infinitenegativeutility.com>")
+        .version(common::VERSION)
+        .author(common::AUTHOR)
         .about("Display the Rust AST for a Recutils file")
         .arg(clap::Arg::with_name("pretty")
              .short("p")
@@ -48,26 +50,17 @@ fn main() {
              .help("The desired output location (or - for stdout)"))
         .get_matches();
 
-    let stdin = io::stdin();
+    let input = unwrap_err(common::input_from_spec(
+        matches.value_of("input")));
+    let mut output = unwrap_err(common::output_from_spec(
+        matches.value_of("output")));
 
-    let input: Box<io::BufRead> =
-        match matches.value_of("input").unwrap_or("-") {
-            "-" => Box::new(stdin.lock()),
-            path =>
-                Box::new(io::BufReader::new(unwrap_err(fs::File::open(path)))),
-        };
-
-    let json = Value::Array(unwrap_err(rrecutils::Recfile::parse(input))
-                            .records
-                            .iter()
-                            .map(|x| record_to_json(x))
-                            .collect());
-
-    let mut output: Box<io::Write> =
-        match matches.value_of("output").unwrap_or("-") {
-            "-" => Box::new(io::stdout()),
-            path => Box::new(unwrap_err(fs::File::open(path))),
-        };
+    let json = Value::Array(
+        unwrap_err(rrecutils::Recfile::parse(input))
+            .records
+            .iter()
+            .map(|x| record_to_json(x))
+            .collect());
 
     let serialized = if matches.is_present("pretty") {
         unwrap_err(serde_json::to_string_pretty(&json))
