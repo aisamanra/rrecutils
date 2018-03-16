@@ -68,26 +68,38 @@ fn run() -> Result<(), FormatErr> {
         .version("0.0")
         .author("Getty Ritter <rrecutils@infinitenegativeutility.com>")
         .about("Display the Rust AST for a Recutils file")
+
         .arg(clap::Arg::with_name("input")
              .short("i")
              .long("input")
              .value_name("FILE")
              .help("The input recfile (or - for stdin)"))
+
         .arg(clap::Arg::with_name("output")
              .short("o")
              .long("output")
              .value_name("FILE")
              .help("The desired output location (or - for stdout)"))
-        .arg(clap::Arg::with_name("template")
-             .short("t")
-             .long("template")
+
+        .arg(clap::Arg::with_name("mustache")
+             .short("m")
+             .long("mustache")
              .value_name("FILE")
-             .help("The template to use"))
+             .help("The mustache template to use"))
+
+        .arg(clap::Arg::with_name("type")
+             .short("t")
+             .long("type")
+             .value_name("TYPE")
+             .takes_value(true)
+             .help("The type of records to pass to the mustache file"))
+
         .arg(clap::Arg::with_name("joiner")
              .short("j")
              .long("joiner")
              .value_name("STRING")
              .help("The string used to separate each fragment"))
+
         .get_matches();
 
     let stdin = io::stdin();
@@ -99,7 +111,7 @@ fn run() -> Result<(), FormatErr> {
                 Box::new(io::BufReader::new(fs::File::open(path)?)),
         };
 
-    let template: String = match matches.value_of("template") {
+    let template: String = match matches.value_of("mustache") {
         Some(path) => {
             use io::Read;
             let mut buf = Vec::new();
@@ -109,7 +121,11 @@ fn run() -> Result<(), FormatErr> {
         None => Err(format!("No template specified!"))?,
     };
 
-    let recfile = rrecutils::Recfile::parse(input)?;
+    let mut recfile = rrecutils::Recfile::parse(input)?;
+
+    if let Some(typ) = matches.value_of("type") {
+        recfile.filter_by_type(typ);
+    }
 
     let mut output: Box<io::Write> =
         match matches.value_of("output").unwrap_or("-") {
@@ -117,7 +133,16 @@ fn run() -> Result<(), FormatErr> {
             path => Box::new(fs::File::open(path)?),
         };
 
+    let joiner = matches.value_of("joiner");
+
+    let mut first = true;
     for r in recfile.records.into_iter() {
+        if first {
+            first = false;
+        } else if let Some(j) = joiner {
+            output.write(j.as_bytes())?;
+            output.write(&['\n' as u8])?;
+        }
         R { rec: r }.render(&template, &mut output.as_mut())?;
     }
 
@@ -125,8 +150,12 @@ fn run() -> Result<(), FormatErr> {
 }
 
 fn main() {
+    use FormatErr::*;
     match run() {
         Ok(()) => (),
-        Err(err) => panic!(err),
+        Err(IOError(_)) => panic!("IO Error"),
+        Err(Utf8Error(_)) => panic!("Cannot decode as UTF-8"),
+        Err(Rustache(r)) => panic!("Rustache error: {:?}", r),
+        Err(Generic(s)) => panic!("{}", s),
     }
 }
