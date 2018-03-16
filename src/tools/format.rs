@@ -106,7 +106,7 @@ fn run() -> Result<(), FormatErr> {
             fs::File::open(path)?.read_to_end(&mut buf)?;
             String::from_utf8(buf)?
         },
-        None => panic!("No template specified!"),
+        None => Err(format!("No template specified!"))?,
     };
 
     let recfile = rrecutils::Recfile::parse(input)?;
