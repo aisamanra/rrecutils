@@ -1,7 +1,12 @@
+pub mod contlines;
+
+use contlines::ContinuationLines;
+
+
 struct ParsingContext {
-    continuation_line: bool,
     current_record_type: Option<String>,
 }
+
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Record {
@@ -9,9 +14,45 @@ pub struct Record {
     pub fields: Vec<(String, String)>,
 }
 
+impl Record {
+    pub fn write<W>(&self, w: &mut W) -> std::io::Result<()>
+        where W: std::io::Write
+    {
+        for &(ref name, ref value) in self.fields.iter() {
+            write!(w, "{}: {}\n", name, value)?;
+        }
+
+        write!(w, "\n")
+    }
+
+    pub fn size(&self) -> usize {
+        self.fields.len()
+    }
+}
+
+
 #[derive(Eq, PartialEq, Debug)]
 pub struct Recfile {
     pub records: Vec<Record>,
+}
+
+impl Recfile {
+    pub fn write<W>(&self, w: &mut W) -> std::io::Result<()>
+        where W: std::io::Write
+    {
+        for r in self.records.iter() {
+            r.write(w)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn filter_by_type(&mut self, type_name: &str) {
+        self.records.retain(|r| match r.rec_type {
+            Some(ref t) => t == type_name,
+            None => false,
+        });
+    }
 }
 
 
@@ -19,14 +60,13 @@ impl Recfile {
     pub fn parse<I>(i: I) -> Result<Recfile, String>
         where I: std::io::BufRead
     {
-        let mut iter = i.lines();
+        let mut iter = ContinuationLines::new(i.lines());
         let mut current = Record {
             fields: vec![],
             rec_type: None,
         };
         let mut buf = vec![];
         let mut ctx = ParsingContext {
-            continuation_line: false,
             current_record_type: None,
         };
 
@@ -76,6 +116,7 @@ impl Recfile {
 
         Ok(Recfile { records: buf })
     }
+
 }
 
 #[cfg(test)]
@@ -86,6 +127,7 @@ mod tests {
         let file = Recfile {
             records: expected.iter().map( |v| {
                 Record {
+                    rec_type: None,
                     fields: v.iter().map( |&(k, v)| {
                         (k.to_owned(), v.to_owned())
                     }).collect(),

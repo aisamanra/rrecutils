@@ -12,6 +12,7 @@ regex = "0.2"
 serde = "*"
 serde_json = "*"
 clap = "2.27.1"
+rustache = "*"
 
 [[bin]]
 name = "rr-pretty"
@@ -20,3 +21,11 @@ path = "src/tools/pretty.rs"
 [[bin]]
 name = "rr-to-json"
 path = "src/tools/tojson.rs"
+
+[[bin]]
+name = "rr-sel"
+path = "src/tools/select.rs"
+
+[[bin]]
+name = "rr-format"
+path = "src/tools/format.rs"
