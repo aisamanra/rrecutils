@@ -1,3 +1,5 @@
+#[macro_use] extern crate failure;
+
 pub mod contlines;
 
 use contlines::ContinuationLines;
@@ -55,9 +57,27 @@ impl Recfile {
     }
 }
 
+#[derive(Debug, Fail)]
+pub enum RecError {
+    #[fail(display = "Error parsing records: {}", message)]
+    GenericError {
+        message: String,
+    },
+
+    #[fail(display = "Found cont line in nonsensical place: {}", ln)]
+    BadContLine {
+        ln: String,
+    },
+
+    #[fail(display = "Invalid line: {}", ln)]
+    InvalidLine {
+        ln: String,
+    },
+}
+
 
 impl Recfile {
-    pub fn parse<I>(i: I) -> Result<Recfile, String>
+    pub fn parse<I>(i: I) -> Result<Recfile, RecError>
         where I: std::io::BufRead
     {
         let mut iter = ContinuationLines::new(i.lines());
@@ -93,9 +113,7 @@ impl Recfile {
                             &ln[1..]
                         });
                 } else {
-                    return Err(format!(
-                        "Found continuation line in nonsensical place: {}",
-                        ln));
+                    return Err(RecError::BadContLine{ ln: ln.to_owned() });
                 }
             } else if let Some(pos) = ln.find(':') {
                 let (key, val) = ln.split_at(pos);
@@ -106,7 +124,7 @@ impl Recfile {
                     ctx.current_record_type = Some(val[1..].trim_left().to_owned());
                 }
             } else {
-                return Err(format!("Invalid line: {:?}", ln));
+                return Err(RecError::InvalidLine { ln: ln.to_owned() });
             }
         }
 

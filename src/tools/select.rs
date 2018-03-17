@@ -1,13 +1,28 @@
 extern crate clap;
 extern crate rrecutils;
+extern crate failure;
 
 mod common;
 
-fn main() {
-    let matches = clap::App::new("rr-sel")
+use failure::Error;
+
+fn rr_select_args() -> clap::ArgMatches<'static> {
+    clap::App::new("rr-sel")
         .version(common::VERSION)
         .author(common::AUTHOR)
         .about("Print records from a recfile")
+
+        .arg(clap::Arg::with_name("input")
+             .short("i")
+             .long("input")
+             .value_name("FILE")
+             .help("The input recfile (or - for stdin)"))
+
+        .arg(clap::Arg::with_name("output")
+             .short("o")
+             .long("output")
+             .value_name("FILE")
+             .help("The desired output location (or - for stdout)"))
 
         .arg(clap::Arg::with_name("type")
              .long("type")
@@ -39,14 +54,31 @@ fn main() {
              .required(false)
              .takes_value(true))
 
-        .get_matches();
+        .get_matches()
+}
 
-    let source = std::io::stdin();
-    let mut records = rrecutils::Recfile::parse(source.lock()).unwrap();
+fn run() -> Result<(), Error> {
+    let matches = rr_select_args();
+
+    let input = common::input_from_spec(
+        matches.value_of("input"))?;
+    let mut output = common::output_from_spec(
+        matches.value_of("output"))?;
+
+    let mut records = rrecutils::Recfile::parse(input)?;
 
     if let Some(typ) = matches.value_of("type") {
         records.filter_by_type(typ);
     }
 
-    records.write(&mut std::io::stdout());
+    records.write(&mut output)?;
+
+    Ok(())
+}
+
+fn main() {
+    match run() {
+        Ok(()) => (),
+        Err(e) => println!("{}", e),
+    }
 }

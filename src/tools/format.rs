@@ -1,10 +1,9 @@
 extern crate clap;
 extern crate rrecutils;
 extern crate rustache;
+#[macro_use] extern crate failure;
 
 use std::{fs,io};
-use std::convert::From;
-use std::string::FromUtf8Error;
 
 mod common;
 
@@ -30,37 +29,6 @@ impl Render for R {
             hb = hb.insert(&field.0, field.1.clone());
         }
         hb.render(template, writer)
-    }
-}
-
-enum FormatErr {
-    IOError(io::Error),
-    Utf8Error(FromUtf8Error),
-    Rustache(rustache::RustacheError),
-    Generic(String),
-}
-
-impl From<io::Error> for FormatErr {
-    fn from(err: io::Error) -> FormatErr {
-        FormatErr::IOError(err)
-    }
-}
-
-impl From<FromUtf8Error> for FormatErr {
-    fn from(err: FromUtf8Error) -> FormatErr {
-        FormatErr::Utf8Error(err)
-    }
-}
-
-impl From<rustache::RustacheError> for FormatErr {
-    fn from(err: rustache::RustacheError) -> FormatErr {
-        FormatErr::Rustache(err)
-    }
-}
-
-impl From<String> for FormatErr {
-    fn from(err: String) -> FormatErr {
-        FormatErr::Generic(err)
     }
 }
 
@@ -105,7 +73,7 @@ fn rr_format_args() -> clap::ArgMatches<'static> {
         .get_matches()
 }
 
-fn run() -> Result<(), FormatErr> {
+fn run() -> Result<(), failure::Error> {
     let matches = rr_format_args();
 
     let input = common::input_from_spec(
@@ -120,7 +88,7 @@ fn run() -> Result<(), FormatErr> {
             fs::File::open(path)?.read_to_end(&mut buf)?;
             String::from_utf8(buf)?
         },
-        None => Err(format!("No template specified!"))?,
+        None => bail!("No template specified!"),
     };
 
     let mut recfile = rrecutils::Recfile::parse(input)?;
@@ -140,19 +108,16 @@ fn run() -> Result<(), FormatErr> {
             output.write(j.as_bytes())?;
             output.write(&['\n' as u8])?;
         }
-        R { rec: r }.render(&template, &mut output.as_mut())?;
+        R { rec: r }.render(&template, &mut output.as_mut())
+            .map_err(|e| format_err!("Rustache error: {:?}", e))?;
     }
 
     Ok(())
 }
 
 fn main() {
-    use FormatErr::*;
     match run() {
         Ok(()) => (),
-        Err(IOError(_)) => panic!("IO Error"),
-        Err(Utf8Error(_)) => panic!("Cannot decode as UTF-8"),
-        Err(Rustache(r)) => panic!("Rustache error: {:?}", r),
-        Err(Generic(s)) => panic!("{}", s),
+        Err(e) => println!("{}", e),
     }
 }

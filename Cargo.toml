@@ -13,6 +13,7 @@ serde = "*"
 serde_json = "*"
 clap = "2.27.1"
 rustache = "*"
+failure = "*"
 
 [[bin]]
 name = "rr-pretty"

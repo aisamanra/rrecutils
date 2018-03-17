@@ -1,5 +1,8 @@
+#![allow(dead_code)]
+
 use std::{fs,io};
 
+/// This can be changed to modify all the tool metadata all at once
 pub const VERSION: &'static str = "0.0";
 pub const AUTHOR: &'static str =
     "Getty Ritter <rrecutils@infinitenegativeutility.com>";
