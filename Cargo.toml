@@ -17,8 +17,8 @@ failure = "0.1.1"
 
 
 [[bin]]
-name = "rr-pretty"
-path = "src/tools/pretty.rs"
+name = "rr-debug"
+path = "src/tools/debug.rs"
 
 [[bin]]
 name = "rr-to-json"
