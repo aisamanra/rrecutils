@@ -51,6 +51,12 @@ fn rr_format_args() -> clap::ArgMatches<'static> {
              .value_name("FILE")
              .help("The desired output location (or - for stdout)"))
 
+        .arg(clap::Arg::with_name("output-files")
+             .short("O")
+             .long("output-files")
+             .value_name("TEMPLATE")
+             .help("The desired output "))
+
         .arg(clap::Arg::with_name("mustache")
              .short("m")
              .long("mustache")
@@ -73,13 +79,59 @@ fn rr_format_args() -> clap::ArgMatches<'static> {
         .get_matches()
 }
 
+
+fn create_output_files(
+    filename_template: &str,
+    recfile: rrecutils::Recfile,
+    template: String,
+) -> Result<(), failure::Error> {
+    for r in recfile.records.into_iter().map( |rec| R { rec } ) {
+        let mut filename = std::io::Cursor::new(Vec::new());
+        r.render(filename_template, &mut filename)
+            .map_err(|e| format_err!("Rustache error: {:?}", e))?;
+        let filename = String::from_utf8(filename.into_inner())?;
+        println!("writing file `{}'", &filename);
+
+        let mut file = std::fs::File::create(&filename)?;
+        r.render(&template, &mut file)
+            .map_err(|e| format_err!("Rustache error: {:?}", e))?;
+    }
+    Ok(())
+}
+
+
+fn render_to_single_file(
+    mut output: Box<std::io::Write>,
+    joiner: Option<&str>,
+    recfile: rrecutils::Recfile,
+    template: String,
+) -> Result<(), failure::Error> {
+    let mut first = true;
+    for r in recfile.records.into_iter() {
+        if first {
+            first = false;
+        } else if let Some(j) = joiner {
+            output.write(j.as_bytes())?;
+            output.write(&['\n' as u8])?;
+        }
+        R { rec: r }.render(&template, &mut output.as_mut())
+            .map_err(|e| format_err!("Rustache error: {:?}", e))?;
+        }
+
+    Ok(())
+}
+
+
 fn run() -> Result<(), failure::Error> {
     let matches = rr_format_args();
 
     let input = common::input_from_spec(
         matches.value_of("input"))?;
-    let mut output = common::output_from_spec(
-        matches.value_of("output"))?;
+
+    let mut recfile = rrecutils::Recfile::parse(input)?;
+    if let Some(typ) = matches.value_of("type") {
+        recfile.filter_by_type(typ);
+    }
 
     let template: String = match matches.value_of("mustache") {
         Some(path) => {
@@ -91,25 +143,15 @@ fn run() -> Result<(), failure::Error> {
         None => bail!("No template specified!"),
     };
 
-    let mut recfile = rrecutils::Recfile::parse(input)?;
-
-    if let Some(typ) = matches.value_of("type") {
-        recfile.filter_by_type(typ);
-    }
-
-
-    let joiner = matches.value_of("joiner");
-
-    let mut first = true;
-    for r in recfile.records.into_iter() {
-        if first {
-            first = false;
-        } else if let Some(j) = joiner {
-            output.write(j.as_bytes())?;
-            output.write(&['\n' as u8])?;
-        }
-        R { rec: r }.render(&template, &mut output.as_mut())
-            .map_err(|e| format_err!("Rustache error: {:?}", e))?;
+    if let Some(filename) = matches.value_of("output-files") {
+        create_output_files(filename, recfile, template)?;
+    } else {
+        render_to_single_file(
+            common::output_from_spec(matches.value_of("output"))?,
+            matches.value_of("joiner"),
+            recfile,
+            template,
+        )?;
     }
 
     Ok(())
