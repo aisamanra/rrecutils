@@ -10,6 +10,9 @@ struct ParsingContext {
 }
 
 
+/// A `Record` is a single bundle of key-value pairs with a few pieces
+/// of optional metadata. This preserves the order of the values
+/// contained.
 #[derive(Eq, PartialEq, Debug)]
 pub struct Record {
     pub rec_type: Option<String>,
@@ -17,6 +20,7 @@ pub struct Record {
 }
 
 impl Record {
+    /// Write the serialized version of this `Record` to the provided `Write`r
     pub fn write<W>(&self, w: &mut W) -> std::io::Result<()>
         where W: std::io::Write
     {
@@ -27,24 +31,38 @@ impl Record {
         write!(w, "\n")
     }
 
+    /// Turn this `Record` into a serialized string representation
+    pub fn to_string(&self) -> std::io::Result<String> {
+        let mut s = std::io::Cursor::new(Vec::new());
+        self.write(&mut s)?;
+        // XXX: this SHOULD be fine, but make sure!
+        Ok(String::from_utf8(s.into_inner()).unwrap())
+    }
+
+    /// Return the number of fields in this record
     pub fn size(&self) -> usize {
         self.fields.len()
     }
 
-    pub fn get<'a>(&'a self, name: &str) -> Option<&'a str> {
+    /// Return the value of the field named by the argument if it
+    /// exists
+    pub fn get<'a>(&'a self, name: &str) -> Result<&'a str, RecError> {
         self.fields.iter()
             .find(|&&(ref p, _)| p == name)
             .map(|&(_, ref q)| q.as_ref())
+            .ok_or(RecError::MissingField { name: name.to_owned() })
     }
 }
 
 
+/// A `Recfile` is a sequence of `Record`.
 #[derive(Eq, PartialEq, Debug)]
 pub struct Recfile {
     pub records: Vec<Record>,
 }
 
 impl Recfile {
+    /// Serialize this `Recfile` to the provided `Write`r
     pub fn write<W>(&self, w: &mut W) -> std::io::Result<()>
         where W: std::io::Write
     {
@@ -55,6 +73,16 @@ impl Recfile {
         Ok(())
     }
 
+    /// Turn this `Recfile` into a serialized string representation
+    pub fn to_string(&self) -> std::io::Result<String> {
+        let mut s = std::io::Cursor::new(Vec::new());
+        self.write(&mut s)?;
+        // XXX: this SHOULD be fine, but make sure!
+        Ok(String::from_utf8(s.into_inner()).unwrap())
+    }
+
+    /// Modify this Recfile in-place by only keeping the records of a
+    /// particular type
     pub fn filter_by_type(&mut self, type_name: &str) {
         self.records.retain(|r| match r.rec_type {
             Some(ref t) => t == type_name,
@@ -62,6 +90,7 @@ impl Recfile {
         });
     }
 
+    /// Iterate over a subset of the records in this recfile
     pub fn iter_by_type<'a>(&'a self, type_name: &'a str) -> RecIterator<'a> {
         RecIterator {
             typ: type_name,
@@ -69,14 +98,15 @@ impl Recfile {
         }
     }
 
+    /// Iterate over _all_ the records in this recfile
     pub fn iter<'a>(&'a self) -> std::slice::Iter<'a, Record> {
         self.records.iter()
     }
 }
 
 pub struct RecIterator<'a> {
-    pub typ: &'a str,
-    pub rec: std::slice::Iter<'a, Record>,
+    typ: &'a str,
+    rec: std::slice::Iter<'a, Record>,
 }
 
 impl<'a> Iterator for RecIterator<'a> {
@@ -108,6 +138,11 @@ pub enum RecError {
     #[fail(display = "Invalid line: {}", ln)]
     InvalidLine {
         ln: String,
+    },
+
+    #[fail(display = "Missing key: {}", name)]
+    MissingField {
+        name: String,
     },
 }
 
