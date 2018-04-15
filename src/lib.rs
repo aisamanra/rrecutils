@@ -30,6 +30,12 @@ impl Record {
     pub fn size(&self) -> usize {
         self.fields.len()
     }
+
+    pub fn get<'a>(&'a self, name: &str) -> Option<&'a str> {
+        self.fields.iter()
+            .find(|&&(ref p, _)| p == name)
+            .map(|&(_, ref q)| q.as_ref())
+    }
 }
 
 
@@ -54,6 +60,36 @@ impl Recfile {
             Some(ref t) => t == type_name,
             None => false,
         });
+    }
+
+    pub fn iter_by_type<'a>(&'a self, type_name: &'a str) -> RecIterator<'a> {
+        RecIterator {
+            typ: type_name,
+            rec: self.records.iter(),
+        }
+    }
+
+    pub fn iter<'a>(&'a self) -> std::slice::Iter<'a, Record> {
+        self.records.iter()
+    }
+}
+
+pub struct RecIterator<'a> {
+    pub typ: &'a str,
+    pub rec: std::slice::Iter<'a, Record>,
+}
+
+impl<'a> Iterator for RecIterator<'a> {
+    type Item = &'a Record;
+
+    fn next(&mut self) -> Option<&'a Record> {
+        while let Some(r) = self.rec.next() {
+            match r.rec_type {
+                Some(ref n) if n == self.typ => return Some(r),
+                _ => (),
+            }
+        }
+        return None;
     }
 }
 
@@ -122,6 +158,7 @@ impl Recfile {
                     val[1..].trim_left().to_owned()));
                 if key == "%rec" {
                     ctx.current_record_type = Some(val[1..].trim_left().to_owned());
+                    current.rec_type = None;
                 }
             } else {
                 return Err(RecError::InvalidLine { ln: ln.to_owned() });
