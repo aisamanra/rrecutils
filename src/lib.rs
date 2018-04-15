@@ -44,6 +44,13 @@ impl Record {
         self.fields.len()
     }
 
+    pub fn get_type<'a>(&'a self) -> Result<&'a str, RecError> {
+        match self.rec_type {
+            Some(ref t) => Ok(t),
+            None => Err(RecError::NoType),
+        }
+    }
+
     /// Return the value of the field named by the argument if it
     /// exists
     pub fn get<'a>(&'a self, name: &str) -> Result<&'a str, RecError> {
@@ -144,6 +151,9 @@ pub enum RecError {
     MissingField {
         name: String,
     },
+
+    #[fail(display = "Missing type for record")]
+    NoType,
 }
 
 
